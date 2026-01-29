@@ -46,7 +46,7 @@ export class ExportService {
       fgColor: { argb: 'FFD3D3D3' },
     }
     
-    return await workbook.xlsx.writeBuffer() as Buffer
+    return await workbook.xlsx.writeBuffer() as unknown as Buffer
   }
   
   static async generateExcelExport(data: ExportData): Promise<Buffer> {
@@ -103,6 +103,6 @@ export class ExportService {
       }
     })
     
-    return await workbook.xlsx.writeBuffer() as Buffer
+    return await workbook.xlsx.writeBuffer() as unknown as Buffer
   }
 }

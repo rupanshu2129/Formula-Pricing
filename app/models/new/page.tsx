@@ -226,7 +226,7 @@ export default function NewModelPage() {
         </CardHeader>
         <CardContent>
           <p className="text-sm text-muted-foreground">
-            Once the model is created, you'll be able to add components like ingredients, 
+            Once the model is created, you&apos;ll be able to add components like ingredients,
             yield adjustments, packaging costs, freight, conversion costs, rebates, and payment terms.
           </p>
         </CardContent>

@@ -217,7 +217,7 @@ export default function ImportsPage() {
                     <div className="space-y-2 max-h-60 overflow-y-auto">
                       {validationResult.errors.map((error: any, index: number) => (
                         <div key={index} className="text-sm bg-red-50 p-2 rounded">
-                          <span className="font-medium">Row {error.row}, Column "{error.column}":</span>{' '}
+                          <span className="font-medium">Row {error.row}, Column &quot;{error.column}&quot;:</span>{' '}
                           {error.error}
                           {error.value && <span className="text-muted-foreground"> (Value: {error.value})</span>}
                         </div>

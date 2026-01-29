@@ -22,6 +22,7 @@ export class ImportService {
         errors.push({
           row: 0,
           column: 'file',
+          value: null,
           error: 'File is empty or has no data rows',
         })
         return { valid: false, errors }
@@ -34,6 +35,7 @@ export class ImportService {
         errors.push({
           row: 0,
           column: 'headers',
+          value: missingColumns,
           error: `Missing required columns: ${missingColumns.join(', ')}`,
         })
       }
@@ -69,6 +71,7 @@ export class ImportService {
       errors.push({
         row: 0,
         column: 'file',
+        value: null,
         error: `Failed to parse file: ${error instanceof Error ? error.message : 'Unknown error'}`,
       })
       return { valid: false, errors }
