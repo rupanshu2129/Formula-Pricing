@@ -1,0 +1,355 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  STRATEGIC_PRICING
+  PRICE_EXECUTION
+  SALES
+  ADMIN
+  AUDIT_FINANCE
+}
+
+enum GovernanceState {
+  DRAFT
+  PEER_REVIEW
+  FINANCE_REVIEW
+  APPROVED
+  ACTIVE
+  EXPIRED
+}
+
+enum ComponentType {
+  INGREDIENT
+  YIELD
+  PACKAGING
+  FREIGHT
+  CONVERSION
+  REBATE
+  TERMS_RATE
+}
+
+enum OutputType {
+  FOB
+  DELIVERED
+  BOTH
+}
+
+enum RunStatus {
+  DRAFT
+  CALCULATING
+  COMPLETED
+  APPROVED
+  PUBLISHED
+  FAILED
+}
+
+enum RefreshFrequency {
+  DAILY
+  WEEKLY
+  MONTHLY
+  QUARTERLY
+  ANNUALLY
+}
+
+enum ImportStatus {
+  PENDING
+  PROCESSING
+  SUCCESS
+  FAILED
+  PARTIAL
+}
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  name          String
+  password      String
+  role          UserRole
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  createdModels PricingModelTemplate[] @relation("CreatedBy")
+  approvals     Approval[]
+  pricingRuns   PricingRun[]
+  auditLogs     AuditLog[]
+  importHistory ImportHistory[]
+}
+
+model Customer {
+  id              String    @id @default(cuid())
+  soldToId        String    @unique
+  shipToId        String?
+  name            String
+  hierarchy       String?
+  segmentId       String?
+  segment         Segment?  @relation(fields: [segmentId], references: [id])
+  active          Boolean   @default(true)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  
+  pricingRuns     PricingRun[]
+  customerOverrides CustomerOverride[]
+  assignmentHistory CustomerAssignment[]
+}
+
+model Segment {
+  id              String    @id @default(cuid())
+  name            String    @unique
+  description     String?
+  defaultMarkets  String[]
+  refreshCadence  RefreshFrequency @default(WEEKLY)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  
+  customers       Customer[]
+  templates       PricingModelTemplate[]
+  assignments     CustomerAssignment[]
+}
+
+model CustomerAssignment {
+  id          String    @id @default(cuid())
+  customerId  String
+  customer    Customer  @relation(fields: [customerId], references: [id])
+  segmentId   String
+  segment     Segment   @relation(fields: [segmentId], references: [id])
+  assignedAt  DateTime  @default(now())
+  assignedBy  String
+  
+  @@index([customerId])
+  @@index([segmentId])
+}
+
+model Product {
+  id              String    @id @default(cuid())
+  materialCode    String    @unique
+  name            String
+  uom             String
+  attributes      Json?
+  marketIndicator String?
+  active          Boolean   @default(true)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  
+  runProducts     PricingRunProduct[]
+}
+
+model MarketIndicator {
+  id              String    @id @default(cuid())
+  name            String    @unique
+  source          String
+  updateFrequency RefreshFrequency
+  currentValue    Float
+  effectiveDate   DateTime
+  expiryDate      DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  
+  history         MarketIndicatorHistory[]
+}
+
+model MarketIndicatorHistory {
+  id          String    @id @default(cuid())
+  indicatorId String
+  indicator   MarketIndicator @relation(fields: [indicatorId], references: [id])
+  value       Float
+  effectiveDate DateTime
+  createdAt   DateTime  @default(now())
+  
+  @@index([indicatorId])
+}
+
+model PricingModelTemplate {
+  id              String    @id @default(cuid())
+  name            String
+  version         Int       @default(1)
+  businessUnit    String
+  category        String
+  bucket          String?
+  outputType      OutputType
+  currency        String    @default("USD")
+  uomRules        Json?
+  roundingRules   Json?
+  effectiveStart  DateTime
+  effectiveEnd    DateTime?
+  governanceState GovernanceState @default(DRAFT)
+  createdById     String
+  createdBy       User      @relation("CreatedBy", fields: [createdById], references: [id])
+  segmentId       String?
+  segment         Segment?  @relation(fields: [segmentId], references: [id])
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  
+  components      FormulaComponent[]
+  approvals       Approval[]
+  pricingRuns     PricingRun[]
+  refreshRules    RefreshRule[]
+  
+  @@unique([name, version])
+}
+
+model FormulaComponent {
+  id              String    @id @default(cuid())
+  templateId      String
+  template        PricingModelTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  type            ComponentType
+  name            String
+  formula         String
+  parameters      Json?
+  isEditable      Boolean   @default(false)
+  owner           String?
+  updateFrequency RefreshFrequency?
+  sortOrder       Int       @default(0)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  
+  overrides       CustomerOverride[]
+  
+  @@index([templateId])
+}
+
+model CustomerOverride {
+  id          String    @id @default(cuid())
+  customerId  String
+  customer    Customer  @relation(fields: [customerId], references: [id])
+  componentId String
+  component   FormulaComponent @relation(fields: [componentId], references: [id], onDelete: Cascade)
+  ignored     Boolean   @default(false)
+  overrideValue Json?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  
+  @@unique([customerId, componentId])
+}
+
+model Approval {
+  id          String    @id @default(cuid())
+  templateId  String
+  template    PricingModelTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  approverId  String
+  approver    User      @relation(fields: [approverId], references: [id])
+  stage       String
+  status      String
+  comments    String?
+  approvedAt  DateTime  @default(now())
+  
+  @@index([templateId])
+}
+
+model PricingRun {
+  id              String    @id @default(cuid())
+  runNumber       String    @unique
+  templateId      String
+  template        PricingModelTemplate @relation(fields: [templateId], references: [id])
+  customerId      String
+  customer        Customer  @relation(fields: [customerId], references: [id])
+  pricingPeriodStart DateTime
+  pricingPeriodEnd   DateTime
+  status          RunStatus @default(DRAFT)
+  inputSnapshot   Json
+  outputSnapshot  Json?
+  executedById    String
+  executedBy      User      @relation(fields: [executedById], references: [id])
+  executedAt      DateTime  @default(now())
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  
+  products        PricingRunProduct[]
+  exports         ExportArtifact[]
+  
+  @@index([customerId])
+  @@index([templateId])
+}
+
+model PricingRunProduct {
+  id          String    @id @default(cuid())
+  runId       String
+  run         PricingRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+  productId   String
+  product     Product   @relation(fields: [productId], references: [id])
+  preYieldSubtotal  Float?
+  postYieldSubtotal Float?
+  fobPrice    Float?
+  totalFOB    Float?
+  deliveredPrice Float?
+  breakdown   Json?
+  createdAt   DateTime  @default(now())
+  
+  @@index([runId])
+}
+
+model ExportArtifact {
+  id          String    @id @default(cuid())
+  runId       String
+  run         PricingRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+  type        String
+  fileName    String
+  filePath    String?
+  fileSize    Int?
+  checksum    String?
+  status      String    @default("GENERATED")
+  publishedAt DateTime?
+  createdAt   DateTime  @default(now())
+  
+  @@index([runId])
+}
+
+model RefreshRule {
+  id          String    @id @default(cuid())
+  templateId  String
+  template    PricingModelTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  targetType  String
+  targetId    String?
+  frequency   RefreshFrequency
+  lastRefresh DateTime?
+  nextRefresh DateTime
+  owner       String
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  
+  @@index([templateId])
+}
+
+model AuditLog {
+  id          String    @id @default(cuid())
+  userId      String
+  user        User      @relation(fields: [userId], references: [id])
+  action      String
+  entityType  String
+  entityId    String
+  changes     Json?
+  ipAddress   String?
+  userAgent   String?
+  createdAt   DateTime  @default(now())
+
+  @@index([userId])
+  @@index([entityType, entityId])
+  @@index([createdAt])
+}
+
+model ImportHistory {
+  id                String    @id @default(cuid())
+  fileName          String
+  fileSize          Int
+  fileType          String
+  uploadedById      String
+  uploadedBy        User      @relation(fields: [uploadedById], references: [id])
+  status            ImportStatus
+  recordsProcessed  Int       @default(0)
+  recordsSuccess    Int       @default(0)
+  recordsFailed     Int       @default(0)
+  errorDetails      Json?
+  startedAt         DateTime  @default(now())
+  completedAt       DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@index([uploadedById])
+  @@index([status])
+  @@index([createdAt])
+}
