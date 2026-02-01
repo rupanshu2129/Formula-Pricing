@@ -76,6 +76,7 @@ NEXTAUTH_URL="http://localhost:3000"
 ```bash
 npm run prisma:generate
 npm run prisma:push
+npm run prisma:seed
 ```
 
 5. Start the development server:
@@ -84,6 +85,45 @@ npm run dev
 ```
 
 6. Open [http://localhost:3000](http://localhost:3000) in your browser
+
+## Deployment to Vercel
+
+### Quick Start
+
+For detailed deployment instructions, see [QUICKSTART.md](./QUICKSTART.md)
+
+**TL;DR:**
+
+1. **Create Database**:
+   - Option A: Vercel Postgres (easiest)
+   - Option B: External provider (Neon, Supabase, Railway)
+
+2. **Set Environment Variable**:
+   ```bash
+   vercel env add DATABASE_URL
+   ```
+
+3. **Run Migration**:
+   ```bash
+   vercel env pull .env.local
+   ./scripts/migrate-db.sh  # or scripts\migrate-db.bat on Windows
+   ```
+
+4. **Deploy**:
+   ```bash
+   vercel --prod
+   ```
+
+### Detailed Deployment Guide
+
+For comprehensive deployment instructions including:
+- Database provider comparisons
+- Migration strategies
+- Troubleshooting
+- Security best practices
+- Performance optimization
+
+See [DEPLOYMENT.md](./DEPLOYMENT.md)
 
 ## Project Structure
 
@@ -109,7 +149,11 @@ vap-pricing-portal/
 │   └── utils.ts            # Helper functions
 ├── types/                   # TypeScript type definitions
 ├── prisma/                  # Database schema
-│   └── schema.prisma       # Prisma data models
+│   ├── schema.prisma       # Prisma data models
+│   └── seed.ts             # Database seed data
+├── scripts/                 # Deployment scripts
+│   ├── migrate-db.sh       # Database migration (Unix)
+│   └── migrate-db.bat      # Database migration (Windows)
 └── public/                  # Static assets
 ```
 
@@ -212,6 +256,7 @@ Automated notifications alert owners when refreshes are due or overdue.
 - `npm run prisma:generate` - Generate Prisma client
 - `npm run prisma:push` - Push schema to database
 - `npm run prisma:studio` - Open Prisma Studio
+- `npm run prisma:seed` - Seed database with sample data
 
 ### Adding New Features
 

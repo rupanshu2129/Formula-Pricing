@@ -99,6 +99,44 @@ export default function PricingRunsPage() {
     }
   }
 
+  const loadModelComponents = async (modelId: string) => {
+    try {
+      const response = await fetch(`/api/pricing-models/${modelId}`)
+      const data = await response.json()
+      if (data.success && data.model) {
+        const ingredientComponents = data.model.components.filter((c: any) => c.type === 'INGREDIENT')
+        const yieldComp = data.model.components.find((c: any) => c.type === 'YIELD')
+        const packagingComp = data.model.components.find((c: any) => c.type === 'PACKAGING')
+        const freightComp = data.model.components.find((c: any) => c.type === 'FREIGHT')
+        const conversionComp = data.model.components.find((c: any) => c.type === 'CONVERSION')
+        const rebateComp = data.model.components.find((c: any) => c.type === 'REBATE')
+        const termsRateComp = data.model.components.find((c: any) => c.type === 'TERMS_RATE')
+
+        const newIngredients = ingredientComponents.length > 0
+          ? ingredientComponents.map((c: any) => ({
+              name: c.name,
+              recipePercent: c.parameters?.recipePercent || 0,
+              marketPrice: c.parameters?.marketPrice || 0,
+            }))
+          : [{ name: '', recipePercent: 0, marketPrice: 0 }]
+
+        setFormData({
+          ...formData,
+          model: modelId,
+          ingredients: newIngredients,
+          yield: yieldComp?.parameters?.value || 0,
+          packaging: packagingComp?.parameters?.value || 0,
+          freight: freightComp?.parameters?.value || 0,
+          conversion: conversionComp?.parameters?.value || 0,
+          rebates: rebateComp?.parameters?.value || 0,
+          paymentTermsRate: termsRateComp?.parameters?.value || 0,
+        })
+      }
+    } catch (error) {
+      console.error('Error loading model components:', error)
+    }
+  }
+
   const handleViewDetails = async (runId: string) => {
     try {
       const response = await fetch(`/api/pricing-runs/${runId}`)
@@ -334,29 +372,6 @@ export default function PricingRunsPage() {
     }
   }
 
-  const addIngredient = () => {
-    setFormData({
-      ...formData,
-      ingredients: [...formData.ingredients, { name: '', recipePercent: 0, marketPrice: 0 }]
-    })
-  }
-
-  const removeIngredient = (index: number) => {
-    if (formData.ingredients.length <= 1) {
-      setErrors({ general: 'At least one ingredient is required' })
-      return
-    }
-
-    const newIngredients = formData.ingredients.filter((_, i) => i !== index)
-    setFormData({ ...formData, ingredients: newIngredients })
-
-    if (errors.ingredients) {
-      const newIngredientErrors = { ...errors.ingredients }
-      delete newIngredientErrors[index]
-      setErrors({ ...errors, ingredients: newIngredientErrors })
-    }
-  }
-
   const updateIngredient = (index: number, field: keyof IngredientInput, value: any) => {
     const newIngredients = [...formData.ingredients]
     newIngredients[index] = { ...newIngredients[index], [field]: value }
@@ -466,7 +481,7 @@ export default function PricingRunsPage() {
                     } bg-background px-3 py-2 text-sm mt-1`}
                     value={formData.model}
                     onChange={(e) => {
-                      setFormData({ ...formData, model: e.target.value })
+                      loadModelComponents(e.target.value)
                       if (errors.model) setErrors({ ...errors, model: undefined })
                     }}
                   >
@@ -546,7 +561,7 @@ export default function PricingRunsPage() {
                   <div>
                     <CardTitle>Ingredients</CardTitle>
                     <CardDescription>
-                      Recipe percentages and market prices
+                      Recipe percentages and market prices (from model)
                       {totalRecipePercent > 0 && (
                         <span className={`ml-2 font-medium ${
                           totalRecipePercent > 100 ? 'text-red-500' :
@@ -558,36 +573,31 @@ export default function PricingRunsPage() {
                       )}
                     </CardDescription>
                   </div>
-                  <Button onClick={addIngredient} size="sm" variant="outline">
-                    <Plus className="h-4 w-4 mr-1" />
-                    Add
-                  </Button>
                 </div>
               </CardHeader>
               <CardContent>
                 <div className="space-y-3">
-                  <div className="grid grid-cols-[1fr_100px_100px_40px] gap-2 text-xs font-medium text-muted-foreground">
+                  <div className="grid grid-cols-[1fr_100px_100px] gap-2 text-xs font-medium text-muted-foreground">
                     <div>Name</div>
                     <div>Recipe %</div>
                     <div>Price ($/lb)</div>
-                    <div></div>
                   </div>
                   {formData.ingredients.map((ing, index) => (
                     <div key={index} className="space-y-1">
-                      <div className="grid grid-cols-[1fr_100px_100px_40px] gap-2">
+                      <div className="grid grid-cols-[1fr_100px_100px] gap-2">
                         <Input
                           value={ing.name}
-                          onChange={(e) => updateIngredient(index, 'name', e.target.value)}
                           placeholder="Ingredient name"
-                          className={errors.ingredients?.[index]?.name ? 'border-red-500' : ''}
+                          disabled
+                          className="bg-muted"
                         />
                         <Input
                           type="number"
                           step="0.01"
                           value={ing.recipePercent}
-                          onChange={(e) => updateIngredient(index, 'recipePercent', parseFloat(e.target.value) || 0)}
                           placeholder="%"
-                          className={errors.ingredients?.[index]?.recipePercent ? 'border-red-500' : ''}
+                          disabled
+                          className="bg-muted"
                         />
                         <Input
                           type="number"
@@ -597,15 +607,6 @@ export default function PricingRunsPage() {
                           placeholder="$/lb"
                           className={errors.ingredients?.[index]?.marketPrice ? 'border-red-500' : ''}
                         />
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => removeIngredient(index)}
-                          disabled={formData.ingredients.length <= 1}
-                          className="h-10 w-10 p-0"
-                        >
-                          <Trash2 className="h-4 w-4 text-red-500" />
-                        </Button>
                       </div>
                       {errors.ingredients?.[index] && (
                         <div className="text-xs text-red-500 pl-1">
@@ -621,7 +622,7 @@ export default function PricingRunsPage() {
             <Card>
               <CardHeader>
                 <CardTitle>Additional Factors</CardTitle>
-                <CardDescription>Yield, packaging, freight, and other adders</CardDescription>
+                <CardDescription>Yield, packaging, freight, and other adders (from model)</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
@@ -631,13 +632,9 @@ export default function PricingRunsPage() {
                       type="number"
                       step="0.01"
                       value={formData.yield}
-                      onChange={(e) => {
-                        setFormData({ ...formData, yield: parseFloat(e.target.value) || 0 })
-                        if (errors.yield) setErrors({ ...errors, yield: undefined })
-                      }}
-                      className={`mt-1 ${errors.yield ? 'border-red-500' : ''}`}
+                      disabled
+                      className="mt-1 bg-muted"
                     />
-                    {errors.yield && <p className="text-xs text-red-500 mt-1">{errors.yield}</p>}
                   </div>
                   <div>
                     <label className="text-sm font-medium">Packaging ($/lb)</label>
@@ -645,13 +642,9 @@ export default function PricingRunsPage() {
                       type="number"
                       step="0.01"
                       value={formData.packaging}
-                      onChange={(e) => {
-                        setFormData({ ...formData, packaging: parseFloat(e.target.value) || 0 })
-                        if (errors.packaging) setErrors({ ...errors, packaging: undefined })
-                      }}
-                      className={`mt-1 ${errors.packaging ? 'border-red-500' : ''}`}
+                      disabled
+                      className="mt-1 bg-muted"
                     />
-                    {errors.packaging && <p className="text-xs text-red-500 mt-1">{errors.packaging}</p>}
                   </div>
                   <div>
                     <label className="text-sm font-medium">Freight ($/lb)</label>
@@ -659,13 +652,9 @@ export default function PricingRunsPage() {
                       type="number"
                       step="0.01"
                       value={formData.freight}
-                      onChange={(e) => {
-                        setFormData({ ...formData, freight: parseFloat(e.target.value) || 0 })
-                        if (errors.freight) setErrors({ ...errors, freight: undefined })
-                      }}
-                      className={`mt-1 ${errors.freight ? 'border-red-500' : ''}`}
+                      disabled
+                      className="mt-1 bg-muted"
                     />
-                    {errors.freight && <p className="text-xs text-red-500 mt-1">{errors.freight}</p>}
                   </div>
                   <div>
                     <label className="text-sm font-medium">Conversion ($/lb)</label>
@@ -673,13 +662,9 @@ export default function PricingRunsPage() {
                       type="number"
                       step="0.01"
                       value={formData.conversion}
-                      onChange={(e) => {
-                        setFormData({ ...formData, conversion: parseFloat(e.target.value) || 0 })
-                        if (errors.conversion) setErrors({ ...errors, conversion: undefined })
-                      }}
-                      className={`mt-1 ${errors.conversion ? 'border-red-500' : ''}`}
+                      disabled
+                      className="mt-1 bg-muted"
                     />
-                    {errors.conversion && <p className="text-xs text-red-500 mt-1">{errors.conversion}</p>}
                   </div>
                   <div>
                     <label className="text-sm font-medium">Rebates ($/lb)</label>
@@ -687,13 +672,9 @@ export default function PricingRunsPage() {
                       type="number"
                       step="0.01"
                       value={formData.rebates}
-                      onChange={(e) => {
-                        setFormData({ ...formData, rebates: parseFloat(e.target.value) || 0 })
-                        if (errors.rebates) setErrors({ ...errors, rebates: undefined })
-                      }}
-                      className={`mt-1 ${errors.rebates ? 'border-red-500' : ''}`}
+                      disabled
+                      className="mt-1 bg-muted"
                     />
-                    {errors.rebates && <p className="text-xs text-red-500 mt-1">{errors.rebates}</p>}
                   </div>
                   <div>
                     <label className="text-sm font-medium">Payment Terms Rate (%)</label>
@@ -701,13 +682,9 @@ export default function PricingRunsPage() {
                       type="number"
                       step="0.01"
                       value={formData.paymentTermsRate}
-                      onChange={(e) => {
-                        setFormData({ ...formData, paymentTermsRate: parseFloat(e.target.value) || 0 })
-                        if (errors.paymentTermsRate) setErrors({ ...errors, paymentTermsRate: undefined })
-                      }}
-                      className={`mt-1 ${errors.paymentTermsRate ? 'border-red-500' : ''}`}
+                      disabled
+                      className="mt-1 bg-muted"
                     />
-                    {errors.paymentTermsRate && <p className="text-xs text-red-500 mt-1">{errors.paymentTermsRate}</p>}
                   </div>
                 </div>
               </CardContent>
